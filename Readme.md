@@ -16,3 +16,4 @@ Setting up a server that will enable uesrs directly use resend on their client a
 ## From the client
 
 - Open `main.js`, enter you api-key
+- run `yarn dev` and send an email from the browser
