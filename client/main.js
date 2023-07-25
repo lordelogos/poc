@@ -1,6 +1,6 @@
 import { ResendClient } from "package";
 
-const apiKey = ""; // replace with api key from https://resend.com
+const apiKey = "re_SPwLEFTG_BQSyp3kMPnTEfKeFdL9ZDQLC"; // replace with api key from https://resend.com
 const resend = new ResendClient(apiKey);
 
 const form = document.getElementById("form");

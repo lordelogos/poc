@@ -1,41 +1,97 @@
-import express from "express";
-import cors from "cors";
-import { Resend } from "resend";
+import http from "http";
+import https from "https";
 
-const app = express();
-const PORT = 9999;
+const PORT = process.env.PORT || 9999;
 
-app.use(cors());
-app.use(express.json());
+async function reqListener(req, res) {
+  const { url, method } = req;
 
-app.post("/send-mail", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  const reqBody = req.body;
-  const authToken = authHeader.split(" ")[1];
-  let resend;
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Request-Method", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "*");
 
-  try {
-    resend = new Resend(authToken);
-  } catch (err) {
-    res.status(403).send("Enter a valid api key");
+  if (url === "/" && method === "GET") {
+    res.end("Hello World");
+  }
+
+  if (method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
     return;
   }
 
-  if (reqBody) {
-    try {
-      await resend.emails.send(reqBody);
-      res.status(200).send("Email sent");
-      return;
-    } catch (err) {
-      res.status(500).send(err);
-      return;
-    }
-  } else {
-    res.status(400).send("Please provide a mail in the request body.");
-    return;
-  }
-});
+  if (url === "/send-mail" && method === "POST") {
+    let body = "";
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+    req.on("data", (chunk) => {
+      body += chunk;
+    });
+
+    req.on("end", async () => {
+      try {
+        const authHeader = req.headers.authorization;
+        const reqBody = body;
+        const authToken = authHeader.split(" ")[1];
+
+        // form the request options to resend api
+        const options = {
+          hostname: "api.resend.com",
+          path: "/emails",
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+            "Content-Length": reqBody.length,
+          },
+        };
+
+        if (reqBody) {
+          try {
+            await makePostRequest(options, reqBody);
+            res.end("Email sent");
+            return;
+          } catch (err) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(err);
+            return;
+          }
+        } else {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end("Please provide a mail in the request body.");
+          return;
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        res.statusCode = 500;
+        res.end(JSON.stringify({ message: "Internal server error" }));
+      }
+    });
+  }
+}
+
+const server = http.createServer(reqListener);
+server.listen(PORT, () => console.log("Server running on " + PORT));
+
+function makePostRequest(options, postData) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let responseData = "";
+
+      res.on("data", (chunk) => {
+        responseData += chunk;
+      });
+
+      res.on("end", () => {
+        resolve(responseData);
+      });
+    });
+
+    req.on("error", (error) => {
+      reject(error);
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
